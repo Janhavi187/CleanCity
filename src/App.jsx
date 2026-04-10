@@ -1,31 +1,59 @@
 import { useEffect, useState, useCallback } from "react"
 import {
-    collection, onSnapshot, doc, updateDoc,
-    query, orderBy, limit
+    collection, onSnapshot, doc, updateDoc, setDoc,
+    query, orderBy, limit, getDoc
 } from "firebase/firestore"
-import { db } from "./firebase"
-import { Leaf, BarChart3, Users, Bell } from "lucide-react"
+import { onAuthStateChanged } from "firebase/auth"
+import { db, auth } from "./firebase"
+import { Leaf, Users, Bell, LogIn, Sun, Moon } from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
 
-import MapView   from "./components/MapView"
+import MapView from "./components/MapView"
 import ReportForm from "./components/ReportForm"
-import Dashboard  from "./components/Dashboard"
-import Toast      from "./components/Toast"
+import Dashboard from "./components/Dashboard"
+import Toast from "./components/Toast"
+import AuthModal from "./components/AuthModal"
+import Leaderboard from "./components/Leaderboard"
+
+/* Points per severity */
+const SEVERITY_POINTS = { low: 10, medium: 25, high: 50 }
 
 function App() {
-    const [reports, setReports]             = useState([])
-    const [location, setLocation]           = useState(null)
+    const [reports, setReports] = useState([])
+    const [location, setLocation] = useState(null)
     const [recentActivity, setRecentActivity] = useState([])
-    const [toasts, setToasts]               = useState([])
-    const [sidebarOpen, setSidebarOpen]     = useState(true)
+    const [toasts, setToasts] = useState([])
+    const [sidebarOpen, setSidebarOpen] = useState(true)
+    const [user, setUser] = useState(null)
+    const [showAuth, setShowAuth] = useState(false)
+    const [theme, setTheme] = useState(() => localStorage.getItem("eco-theme") || "dark")
 
-    // Push a toast notification
+    /* ── Theme effect ── */
+    useEffect(() => {
+        if (theme === "light") {
+            document.body.classList.add("light-theme")
+        } else {
+            document.body.classList.remove("light-theme")
+        }
+        localStorage.setItem("eco-theme", theme)
+    }, [theme])
+
+    const toggleTheme = () => setTheme(t => t === "dark" ? "light" : "dark")
+
+    /* ── Auth listener ── */
+    useEffect(() => {
+        const unsub = onAuthStateChanged(auth, (u) => setUser(u || null))
+        return () => unsub()
+    }, [])
+
+    /* ── Push a toast notification ── */
     const pushToast = useCallback((msg, type = "info") => {
         const id = Date.now()
         setToasts(t => [...t, { id, msg, type }])
         setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4000)
     }, [])
 
+    /* ── Firestore listeners ── */
     useEffect(() => {
         // All reports — map + stats
         const unsub = onSnapshot(collection(db, "reports"), (snap) => {
@@ -44,14 +72,66 @@ function App() {
         return () => { unsub(); unsubActivity() }
     }, [])
 
+    /* ── Claim a pickup (requires sign-in) ── */
     const handleClaim = async (id) => {
-        await updateDoc(doc(db, "reports", id), { status: "in_progress" })
+        if (!user) { setShowAuth(true); return }
+        await updateDoc(doc(db, "reports", id), {
+            status: "in_progress",
+            volunteerUid: user.uid,
+            volunteerName: user.displayName,
+            volunteerPhoto: user.photoURL || ""
+        })
         pushToast("Pickup claimed! En route 🚛", "success")
     }
 
-    const handleMarkCleaned = async (id) => {
-        await updateDoc(doc(db, "reports", id), { status: "cleaned" })
-        pushToast("Marked as cleaned! +10 XP 🌿", "success")
+    /* ── Mark as cleaned + award points ── */
+    const handleMarkCleaned = async (id, afterImageUrl = null) => {
+        if (!user) { setShowAuth(true); return }
+
+        // If no afterImageUrl is provided, we move to 'pending_proof' 
+        // (though in the UI we will try to ensure it's provided)
+        const finalStatus = afterImageUrl ? "cleaned" : "pending_proof"
+
+        // Get the report to find severity
+        const reportSnap = await getDoc(doc(db, "reports", id))
+        if (!reportSnap.exists()) return
+        const reportData = reportSnap.data()
+        
+        const pts = SEVERITY_POINTS[reportData.severity] || 10
+
+        // Update the report
+        await updateDoc(doc(db, "reports", id), {
+            status: finalStatus,
+            pointsEarned: afterImageUrl ? pts : 0,
+            cleanedByUid: user.uid,
+            cleanedByName: user.displayName,
+            afterImageUrl: afterImageUrl || ""
+        })
+
+        // Upsert volunteer score in volunteers collection only if fully cleaned
+        if (afterImageUrl) {
+            const volRef = doc(db, "volunteers", user.uid)
+            const volSnap = await getDoc(volRef)
+            if (volSnap.exists()) {
+                const existing = volSnap.data()
+                await setDoc(volRef, {
+                    name: user.displayName,
+                    photoURL: user.photoURL || "",
+                    totalScore: (existing.totalScore || 0) + pts,
+                    cleanupCount: (existing.cleanupCount || 0) + 1
+                })
+            } else {
+                await setDoc(volRef, {
+                    name: user.displayName,
+                    photoURL: user.photoURL || "",
+                    totalScore: pts,
+                    cleanupCount: 1
+                })
+            }
+            pushToast(`Spot fully cleaned! +${pts} pts 🌿`, "success")
+        } else {
+            pushToast("Proof pending. Upload 'After' photo to earn points!", "info")
+        }
     }
 
     return (
@@ -87,10 +167,13 @@ function App() {
                 setLocation={setLocation}
                 onClaim={handleClaim}
                 onMarkCleaned={handleMarkCleaned}
+                user={user}
+                onRequestAuth={() => setShowAuth(true)}
+                theme={theme}
             />
 
             {/* ── Report Form (bottom-left) ── */}
-            <ReportForm location={location} pushToast={pushToast} />
+            <ReportForm location={location} pushToast={pushToast} user={user} />
 
             {/* ── Right Sidebar ── */}
             <div style={{
@@ -99,30 +182,9 @@ function App() {
                 transition: "opacity 0.3s", opacity: sidebarOpen ? 1 : 0,
                 pointerEvents: sidebarOpen ? "auto" : "none"
             }}>
-                {/* Leaderboard */}
+                {/* Live Leaderboard */}
                 <div className="glass-card">
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                        <BarChart3 size={16} color="#22c55e" />
-                        <span style={{ fontWeight: 700, fontSize: "0.875rem" }}>Eco Warriors</span>
-                    </div>
-                    {[
-                        { name: "Priya Sharma", pts: 450, emoji: "🥇" },
-                        { name: "Arjun Mehta",  pts: 380, emoji: "🥈" },
-                        { name: "Divya Rao",    pts: 310, emoji: "🥉" },
-                        { name: "Rahul Nair",   pts: 240, emoji: "⭐" },
-                    ].map((u, i) => (
-                        <div key={i} style={{
-                            display: "flex", justifyContent: "space-between",
-                            alignItems: "center", padding: "6px 0",
-                            borderBottom: i < 3 ? "1px solid rgba(255,255,255,0.05)" : "none"
-                        }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                <span style={{ fontSize: "1rem" }}>{u.emoji}</span>
-                                <span style={{ fontSize: "0.8rem" }}>{u.name}</span>
-                            </div>
-                            <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "#22c55e" }}>{u.pts} XP</span>
-                        </div>
-                    ))}
+                    <Leaderboard />
                 </div>
 
                 {/* Live Activity Feed */}
@@ -167,22 +229,97 @@ function App() {
                         </AnimatePresence>
                     </div>
                 </div>
+
+                {/* Volunteer sign-in card */}
+                {!user && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="glass-card"
+                        style={{ textAlign: "center", padding: "1rem" }}
+                    >
+                        <p style={{ margin: "0 0 6px", fontSize: "0.78rem", color: "#94a3b8", fontWeight: 600 }}>
+                            Want to help clean up?
+                        </p>
+                        <p style={{ margin: "0 0 12px", fontSize: "0.7rem", color: "#475569" }}>
+                            Sign in to earn points &amp; rank up
+                        </p>
+                        <button
+                            onClick={() => setShowAuth(true)}
+                            style={{
+                                width: "100%", padding: "8px",
+                                background: "linear-gradient(135deg,#22c55e,#16a34a)",
+                                border: "none", borderRadius: "0.5rem",
+                                color: "#060b14", fontWeight: 700, fontSize: "0.8rem",
+                                cursor: "pointer", display: "flex",
+                                alignItems: "center", justifyContent: "center", gap: 6
+                            }}
+                        >
+                            <LogIn size={14} /> Volunteer Sign In
+                        </button>
+                    </motion.div>
+                )}
+
+                {/* Signed-in volunteer chip */}
+                {user && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="glass-card"
+                        style={{
+                            display: "flex", alignItems: "center", gap: 10,
+                            padding: "0.75rem 1rem", cursor: "pointer"
+                        }}
+                        onClick={() => setShowAuth(true)}
+                    >
+                        {user.photoURL
+                            ? <img src={user.photoURL} alt="avatar" style={{ width: 32, height: 32, borderRadius: "50%", border: "1.5px solid rgba(34,197,94,0.5)" }} />
+                            : <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#22c55e20", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem" }}>👤</div>
+                        }
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ margin: 0, fontSize: "0.78rem", fontWeight: 700, color: "#e2e8f0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                {user.displayName}
+                            </p>
+                            <p style={{ margin: 0, fontSize: "0.65rem", color: "#22c55e" }}>Volunteer ✓</p>
+                        </div>
+                    </motion.div>
+                )}
             </div>
 
-            {/* Sidebar toggle */}
-            <button
-                onClick={() => setSidebarOpen(o => !o)}
-                style={{
-                    position: "fixed", top: 20, right: 16, zIndex: 2000,
-                    background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)",
-                    borderRadius: "0.5rem", padding: "7px 10px",
-                    color: "#e2e8f0", fontSize: "0.75rem", fontWeight: 600, cursor: "pointer",
-                    backdropFilter: "blur(12px)"
-                }}
-            >
-                <Users size={15} style={{ display: "inline", marginRight: 4 }} />
-                {sidebarOpen ? "Hide Panel" : "Show Panel"}
-            </button>
+            {/* Sidebar toggle + Theme toggle */}
+            <div style={{ position: "fixed", top: 20, right: 16, zIndex: 2000, display: "flex", gap: 8 }}>
+                {/* Theme toggle */}
+                <button
+                    onClick={toggleTheme}
+                    title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                    style={{
+                        background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)",
+                        borderRadius: "0.5rem", padding: "7px 9px",
+                        color: "#e2e8f0", cursor: "pointer",
+                        backdropFilter: "blur(12px)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        transition: "background 0.2s, border-color 0.2s"
+                    }}
+                >
+                    {theme === "dark"
+                        ? <Sun size={15} color="#fbbf24" />
+                        : <Moon size={15} color="#3b82f6" />}
+                </button>
+
+                {/* Sidebar toggle */}
+                <button
+                    onClick={() => setSidebarOpen(o => !o)}
+                    style={{
+                        background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)",
+                        borderRadius: "0.5rem", padding: "7px 10px",
+                        color: "#e2e8f0", fontSize: "0.75rem", fontWeight: 600, cursor: "pointer",
+                        backdropFilter: "blur(12px)"
+                    }}
+                >
+                    <Users size={15} style={{ display: "inline", marginRight: 4 }} />
+                    {sidebarOpen ? "Hide Panel" : "Show Panel"}
+                </button>
+            </div>
 
             {/* Background ambient glows */}
             <div style={{
@@ -207,12 +344,15 @@ function App() {
                     {toasts.map(t => <Toast key={t.id} msg={t.msg} type={t.type} />)}
                 </AnimatePresence>
             </div>
+
+            {/* Auth Modal */}
+            {showAuth && <AuthModal user={user} onClose={() => setShowAuth(false)} />}
         </div>
     )
 }
 
 function severityColor(s) {
-    if (s === "high")   return "#f87171"
+    if (s === "high") return "#f87171"
     if (s === "medium") return "#fbbf24"
     return "#4ade80"
 }

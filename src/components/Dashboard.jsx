@@ -1,20 +1,22 @@
-import { LayoutList, Clock, CheckCircle, Trophy } from "lucide-react"
+import { LayoutList, Clock, CheckCircle, Trophy, ImagePlus } from "lucide-react"
 import { motion } from "framer-motion"
 
 const STATS = [
-    { key: "total",      label: "Reports",    color: "#3b82f6", icon: LayoutList },
-    { key: "inProgress", label: "Active",     color: "#f59e0b", icon: Clock      },
-    { key: "cleaned",    label: "Cleaned",    color: "#22c55e", icon: CheckCircle },
-    { key: "points",     label: "Total XP",   color: "#a855f7", icon: Trophy     },
+    { key: "total", label: "Reports", color: "#3b82f6", icon: LayoutList },
+    { key: "pending", label: "Pending", color: "#f59e0b", icon: ImagePlus }, // Added pending proof
+    { key: "cleaned", label: "Cleaned", color: "#22c55e", icon: CheckCircle },
+    { key: "points", label: "Total XP", color: "#a855f7", icon: Trophy },
 ]
 
 export default function Dashboard({ reports }) {
     const total      = reports.length
-    const inProgress = reports.filter(r => r.status === "in_progress").length
+    const pending    = reports.filter(r => r.status === "in_progress" || r.status === "pending_proof").length
     const cleaned    = reports.filter(r => r.status === "cleaned").length
-    const points     = cleaned * 10
+    const points     = reports
+        .filter(r => r.status === "cleaned")
+        .reduce((sum, r) => sum + (r.pointsEarned || 10), 0)
 
-    const values = { total, inProgress, cleaned, points }
+    const values = { total, pending, cleaned, points }
 
     return (
         <div style={{

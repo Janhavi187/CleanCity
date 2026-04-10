@@ -1,7 +1,7 @@
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, ZoomControl } from "react-leaflet"
 import L from "leaflet"
 import { useState, useRef } from "react"
-import { Layers, Navigation } from "lucide-react"
+import { Layers, Navigation, ImagePlus, Camera, Loader2, Sparkles } from "lucide-react"
 
 /* ── Severity colours ── */
 const SEV_COLOR = { high: "#ef4444", medium: "#f59e0b", low: "#22c55e" }
@@ -42,18 +42,76 @@ function MapClickHandler({ setLocation, pinRef }) {
     return null
 }
 
+/* Before/After Comparison Card */
+function ComparisonCard({ before, after }) {
+    return (
+        <div style={{ display: "flex", gap: 2, height: 100, marginBottom: 8, borderRadius: "0.5rem", overflow: "hidden" }}>
+            <div style={{ position: "relative", flex: 1 }}>
+                <img src={before} alt="Before" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <span style={{ position: "absolute", bottom: 4, left: 4, background: "rgba(0,0,0,0.6)", color: "white", fontSize: "0.5rem", padding: "1px 4px", borderRadius: 2 }}>BEFORE</span>
+            </div>
+            <div style={{ position: "relative", flex: 1 }}>
+                <img src={after} alt="After" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <span style={{ position: "absolute", bottom: 4, left: 4, background: "rgba(34,197,94,0.8)", color: "white", fontSize: "0.5rem", padding: "1px 4px", borderRadius: 2 }}>AFTER</span>
+            </div>
+        </div>
+    )
+}
+
 /* Popup card */
-function ReportPopup({ r, onClaim, onMarkCleaned }) {
+function ReportPopup({ r, onClaim, onMarkCleaned, user, onRequestAuth }) {
+    const [isUploading, setIsUploading] = useState(false)
+    const [preview, setPreview] = useState(null)
+    const fileRef = useRef(null)
+
+    const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
+    const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
+
     const color = SEV_COLOR[r.severity] || "#22c55e"
     const statusBadge = {
-        reported: { bg: "#1e3a5f", color: "#60a5fa", label: "Reported" },
-        in_progress: { bg: "#3d2900", color: "#fbbf24", label: "In Progress" },
-        cleaned: { bg: "#0d2e1a", color: "#4ade80", label: "Cleaned ✓" },
+        reported:      { bg: "#1e3a5f", color: "#60a5fa", label: "Reported" },
+        in_progress:   { bg: "#3d2900", color: "#fbbf24", label: "In Progress" },
+        pending_proof: { bg: "#3d1e00", color: "#f59e0b", label: "Pending Proof" },
+        cleaned:       { bg: "#0d2e1a", color: "#4ade80", label: "Cleaned ✓" },
     }[r.status] || {}
 
+    const isVolunteer = !!user
+    const isOwner = user && r.volunteerUid === user.uid
+
+    const handleFileChange = (e) => {
+        const file = e.target.files[0]
+        if (file) setPreview(URL.createObjectURL(file))
+    }
+
+    const handleSubmitProof = async () => {
+        const file = fileRef.current?.files[0]
+        if (!file) return
+
+        setIsUploading(true)
+        try {
+            const formData = new FormData()
+            formData.append("file", file)
+            formData.append("upload_preset", UPLOAD_PRESET)
+
+            const res = await fetch(
+                `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+                { method: "POST", body: formData }
+            )
+            const data = await res.json()
+            await onMarkCleaned(r.id, data.secure_url)
+        } catch (error) {
+            console.error(error)
+            alert("Upload failed")
+        } finally {
+            setIsUploading(false)
+        }
+    }
+
     return (
-        <div style={{ width: 210, overflow: "hidden", borderRadius: "0.75rem" }}>
-            {r.imageUrl && (
+        <div style={{ width: 220, overflow: "hidden", borderRadius: "0.75rem" }}>
+            {r.status === "cleaned" && r.afterImageUrl ? (
+                <ComparisonCard before={r.imageUrl} after={r.afterImageUrl} />
+            ) : r.imageUrl && (
                 <div style={{ position: "relative" }}>
                     <img src={r.imageUrl} alt="Waste"
                         style={{ width: "100%", height: 110, objectFit: "cover", display: "block" }} />
@@ -67,13 +125,11 @@ function ReportPopup({ r, onClaim, onMarkCleaned }) {
                     </span>
                 </div>
             )}
+
             <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 7 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{
-                        fontSize: "0.72rem", fontWeight: 700,
-                        color: r.wasteType ? "#e2e8f0" : "#64748b"
-                    }}>
-                        {r.wasteType || "Unknown Type"}
+                    <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#e2e8f0" }}>
+                        {r.wasteType || "Waste Spot"}
                     </span>
                     <span style={{
                         background: statusBadge.bg, color: statusBadge.color,
@@ -83,42 +139,87 @@ function ReportPopup({ r, onClaim, onMarkCleaned }) {
                         {statusBadge.label}
                     </span>
                 </div>
-                <span style={{ fontSize: "0.65rem", color: "#475569" }}>
-                    {new Date(r.createdAt).toLocaleString()}
-                </span>
+
+                {r.status === "cleaned" && (
+                    <div style={{ fontSize: "0.65rem", color: "#4ade80", fontWeight: 600 }}>
+                        Awarded +{r.pointsEarned} pts
+                    </div>
+                )}
 
                 {r.status === "reported" && (
-                    <button onClick={() => onClaim(r.id)} style={{
-                        background: "linear-gradient(135deg,#3b82f6,#1d4ed8)",
-                        color: "white", fontWeight: 700, fontSize: "0.78rem",
-                        padding: "8px", borderRadius: "0.5rem", border: "none",
-                        cursor: "pointer", width: "100%"
-                    }}>
-                        🚛 Claim Pickup
-                    </button>
+                    isVolunteer
+                        ? <button onClick={() => onClaim(r.id)} style={{
+                            background: "linear-gradient(135deg,#3b82f6,#1d4ed8)",
+                            color: "white", fontWeight: 700, fontSize: "0.78rem",
+                            padding: "8px", borderRadius: "0.5rem", border: "none",
+                            cursor: "pointer", width: "100%"
+                          }}>🚛 Claim Pickup</button>
+                        : <button onClick={onRequestAuth} className="btn-outline" style={{ padding: "8px", width: "100%", opacity: 0.8 }}>
+                            Sign in to Clean
+                          </button>
                 )}
+
                 {r.status === "in_progress" && (
-                    <button onClick={() => onMarkCleaned(r.id)} style={{
-                        background: "linear-gradient(135deg,#22c55e,#16a34a)",
-                        color: "#060b14", fontWeight: 700, fontSize: "0.78rem",
-                        padding: "8px", borderRadius: "0.5rem", border: "none",
-                        cursor: "pointer", width: "100%"
-                    }}>
-                        ✅ Mark as Cleaned
-                    </button>
+                    isOwner ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            <input type="file" ref={fileRef} hidden onChange={handleFileChange} accept="image/*" />
+                            <button onClick={() => fileRef.current?.click()} style={{
+                                background: "rgba(255,255,255,0.05)",
+                                border: "1px dashed rgba(255,255,255,0.2)",
+                                borderRadius: "0.5rem", padding: "12px",
+                                display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                                cursor: "pointer"
+                            }}>
+                                {preview ? (
+                                    <img src={preview} style={{ width: "100%", height: 60, objectFit: "cover", borderRadius: 4 }} />
+                                ) : (
+                                    <>
+                                        <Camera size={20} color="#94a3b8" />
+                                        <span style={{ fontSize: "0.6rem", color: "#94a3b8" }}>Upload Proof (After Photo)</span>
+                                    </>
+                                )}
+                            </button>
+                            <button 
+                                disabled={!preview || isUploading}
+                                onClick={handleSubmitProof} 
+                                style={{
+                                    background: "linear-gradient(135deg,#22c55e,#16a34a)",
+                                    color: "#060b14", fontWeight: 700, fontSize: "0.78rem",
+                                    padding: "8px", borderRadius: "0.5rem", border: "none",
+                                    cursor: "pointer", opacity: (!preview || isUploading) ? 0.5 : 1
+                                }}
+                            >
+                                {isUploading ? <Loader2 size={16} className="animate-spin" style={{ margin: "auto" }} /> : "✅ Submit Proof"}
+                            </button>
+                        </div>
+                    ) : (
+                        <div style={{ fontSize: "0.65rem", color: "#64748b", fontStyle: "italic", textAlign: "center", padding: "4px" }}>
+                            Claimed by another volunteer
+                        </div>
+                    )
+                )}
+
+                {r.status === "pending_proof" && (
+                    <div style={{ fontSize: "0.65rem", color: "#f59e0b", background: "#f59e0b10", padding: "8px", borderRadius: "0.5rem", textAlign: "center" }}>
+                        Volunteer working on cleanup...
+                    </div>
                 )}
             </div>
         </div>
     )
 }
 
-export default function MapView({ reports, setLocation, onClaim, onMarkCleaned }) {
+export default function MapView({ reports, setLocation, onClaim, onMarkCleaned, user, onRequestAuth, theme }) {
     const [filter, setFilter] = useState("all")
     const pinRef = useRef(null)
 
     const visible = filter === "all"
         ? reports
         : reports.filter(r => r.status === filter)
+
+    const tileUrl = theme === "light"
+        ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+        : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
 
     return (
         <div style={{ position: "relative", width: "100%", height: "100vh" }}>
@@ -128,14 +229,20 @@ export default function MapView({ reports, setLocation, onClaim, onMarkCleaned }
                 style={{ width: "100%", height: "100%" }}
                 zoomControl={false}
             >
-                <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+                <TileLayer url={tileUrl} />
                 <ZoomControl position="bottomright" />
                 <MapClickHandler setLocation={setLocation} pinRef={pinRef} />
 
                 {visible.map(r => (
                     <Marker key={r.id} position={[r.lat, r.lng]} icon={createMarkerIcon(r.severity)}>
-                        <Popup closeButton={true} maxWidth={220} minWidth={210}>
-                            <ReportPopup r={r} onClaim={onClaim} onMarkCleaned={onMarkCleaned} />
+                        <Popup closeButton={true} maxWidth={240} minWidth={220}>
+                            <ReportPopup
+                                r={r}
+                                onClaim={onClaim}
+                                onMarkCleaned={onMarkCleaned}
+                                user={user}
+                                onRequestAuth={onRequestAuth}
+                            />
                         </Popup>
                     </Marker>
                 ))}
