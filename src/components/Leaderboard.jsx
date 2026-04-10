@@ -3,6 +3,7 @@ import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestor
 import { db } from "../firebase"
 import { motion, AnimatePresence } from "framer-motion"
 import { Trophy, Medal } from "lucide-react"
+import { useLanguage } from "../context/LanguageContext"
 
 const RANK_EMOJI = ["🥇", "🥈", "🥉", "⭐", "✨", "🌿", "💚"]
 
@@ -14,6 +15,7 @@ function getRankStyle(i) {
 }
 
 export default function Leaderboard() {
+    const { t } = useLanguage()
     const [volunteers, setVolunteers] = useState([])
 
     useEffect(() => {
@@ -32,7 +34,7 @@ export default function Leaderboard() {
         <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
                 <Trophy size={16} color="#fbbf24" />
-                <span style={{ fontWeight: 700, fontSize: "0.875rem" }}>Eco Warriors</span>
+                <span style={{ fontWeight: 700, fontSize: "0.875rem" }}>{t('eco_warriors')}</span>
                 <span style={{
                     marginLeft: "auto",
                     background: "rgba(34,197,94,0.15)", color: "#4ade80",
@@ -44,7 +46,7 @@ export default function Leaderboard() {
 
             {volunteers.length === 0 ? (
                 <p style={{ fontSize: "0.75rem", color: "#475569", textAlign: "center", padding: "16px 0" }}>
-                    No volunteers yet — be the first! 🌿
+                    {t('no_volunteers')}
                 </p>
             ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -114,7 +116,7 @@ export default function Leaderboard() {
                                             {v.name || "Anonymous"}
                                         </p>
                                         <p style={{ margin: 0, fontSize: "0.65rem", color: "#475569" }}>
-                                            {v.cleanupCount || 0} cleanup{v.cleanupCount !== 1 ? "s" : ""}
+                                            {v.cleanupCount || 0} {v.cleanupCount !== 1 ? t('cleanups') : t('cleanup')}
                                         </p>
                                     </div>
 
@@ -126,7 +128,7 @@ export default function Leaderboard() {
                                         }}>
                                             {v.totalScore || 0}
                                         </span>
-                                        <span style={{ fontSize: "0.6rem", color: "#475569", marginLeft: 2 }}>pts</span>
+                                        <span style={{ fontSize: "0.6rem", color: "#475569", marginLeft: 2 }}>{t('pts')}</span>
                                     </div>
                                 </motion.div>
                             )

@@ -2,6 +2,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMapEvents, ZoomControl } fro
 import L from "leaflet"
 import { useState, useRef } from "react"
 import { Layers, Navigation, ImagePlus, Camera, Loader2, Sparkles } from "lucide-react"
+import { useLanguage } from "../context/LanguageContext"
 
 /* ── Severity colours ── */
 const SEV_COLOR = { high: "#ef4444", medium: "#f59e0b", low: "#22c55e" }
@@ -43,23 +44,23 @@ function MapClickHandler({ setLocation, pinRef }) {
 }
 
 /* Before/After Comparison Card */
-function ComparisonCard({ before, after }) {
+function ComparisonCard({ before, after, t }) {
     return (
         <div style={{ display: "flex", gap: 2, height: 100, marginBottom: 8, borderRadius: "0.5rem", overflow: "hidden" }}>
             <div style={{ position: "relative", flex: 1 }}>
                 <img src={before} alt="Before" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                <span style={{ position: "absolute", bottom: 4, left: 4, background: "rgba(0,0,0,0.6)", color: "white", fontSize: "0.5rem", padding: "1px 4px", borderRadius: 2 }}>BEFORE</span>
+                <span style={{ position: "absolute", bottom: 4, left: 4, background: "rgba(0,0,0,0.6)", color: "white", fontSize: "0.5rem", padding: "1px 4px", borderRadius: 2 }}>{t('before_label')}</span>
             </div>
             <div style={{ position: "relative", flex: 1 }}>
                 <img src={after} alt="After" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                <span style={{ position: "absolute", bottom: 4, left: 4, background: "rgba(34,197,94,0.8)", color: "white", fontSize: "0.5rem", padding: "1px 4px", borderRadius: 2 }}>AFTER</span>
+                <span style={{ position: "absolute", bottom: 4, left: 4, background: "rgba(34,197,94,0.8)", color: "white", fontSize: "0.5rem", padding: "1px 4px", borderRadius: 2 }}>{t('after_label')}</span>
             </div>
         </div>
     )
 }
 
 /* Popup card */
-function ReportPopup({ r, onClaim, onMarkCleaned, user, onRequestAuth }) {
+function ReportPopup({ r, onClaim, onMarkCleaned, user, onRequestAuth, t }) {
     const [isUploading, setIsUploading] = useState(false)
     const [preview, setPreview] = useState(null)
     const fileRef = useRef(null)
@@ -69,10 +70,10 @@ function ReportPopup({ r, onClaim, onMarkCleaned, user, onRequestAuth }) {
 
     const color = SEV_COLOR[r.severity] || "#22c55e"
     const statusBadge = {
-        reported:      { bg: "#1e3a5f", color: "#60a5fa", label: "Reported" },
-        in_progress:   { bg: "#3d2900", color: "#fbbf24", label: "In Progress" },
-        pending_proof: { bg: "#3d1e00", color: "#f59e0b", label: "Pending Proof" },
-        cleaned:       { bg: "#0d2e1a", color: "#4ade80", label: "Cleaned ✓" },
+        reported:      { bg: "#1e3a5f", color: "#60a5fa", label: t('status_reported') },
+        in_progress:   { bg: "#3d2900", color: "#fbbf24", label: t('status_in_progress') },
+        pending_proof: { bg: "#3d1e00", color: "#f59e0b", label: t('status_pending_proof') },
+        cleaned:       { bg: "#0d2e1a", color: "#4ade80", label: t('status_cleaned') },
     }[r.status] || {}
 
     const isVolunteer = !!user
@@ -101,7 +102,7 @@ function ReportPopup({ r, onClaim, onMarkCleaned, user, onRequestAuth }) {
             await onMarkCleaned(r.id, data.secure_url)
         } catch (error) {
             console.error(error)
-            alert("Upload failed")
+            alert(t('t_upload_failed'))
         } finally {
             setIsUploading(false)
         }
@@ -110,7 +111,7 @@ function ReportPopup({ r, onClaim, onMarkCleaned, user, onRequestAuth }) {
     return (
         <div style={{ width: 220, overflow: "hidden", borderRadius: "0.75rem" }}>
             {r.status === "cleaned" && r.afterImageUrl ? (
-                <ComparisonCard before={r.imageUrl} after={r.afterImageUrl} />
+                <ComparisonCard before={r.imageUrl} after={r.afterImageUrl} t={t} />
             ) : r.imageUrl && (
                 <div style={{ position: "relative" }}>
                     <img src={r.imageUrl} alt="Waste"
@@ -129,7 +130,7 @@ function ReportPopup({ r, onClaim, onMarkCleaned, user, onRequestAuth }) {
             <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 7 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#e2e8f0" }}>
-                        {r.wasteType || "Waste Spot"}
+                        {t(r.wasteType) || t('waste_spot')}
                     </span>
                     <span style={{
                         background: statusBadge.bg, color: statusBadge.color,
@@ -142,7 +143,7 @@ function ReportPopup({ r, onClaim, onMarkCleaned, user, onRequestAuth }) {
 
                 {r.status === "cleaned" && (
                     <div style={{ fontSize: "0.65rem", color: "#4ade80", fontWeight: 600 }}>
-                        Awarded +{r.pointsEarned} pts
+                        {t('pts_earned')} {r.pointsEarned} {t('pts')}
                     </div>
                 )}
 
@@ -153,9 +154,9 @@ function ReportPopup({ r, onClaim, onMarkCleaned, user, onRequestAuth }) {
                             color: "white", fontWeight: 700, fontSize: "0.78rem",
                             padding: "8px", borderRadius: "0.5rem", border: "none",
                             cursor: "pointer", width: "100%"
-                          }}>🚛 Claim Pickup</button>
+                          }}>{t('claim_pickup')}</button>
                         : <button onClick={onRequestAuth} className="btn-outline" style={{ padding: "8px", width: "100%", opacity: 0.8 }}>
-                            Sign in to Clean
+                            {t('sign_in_to_clean')}
                           </button>
                 )}
 
@@ -175,7 +176,7 @@ function ReportPopup({ r, onClaim, onMarkCleaned, user, onRequestAuth }) {
                                 ) : (
                                     <>
                                         <Camera size={20} color="#94a3b8" />
-                                        <span style={{ fontSize: "0.6rem", color: "#94a3b8" }}>Upload Proof (After Photo)</span>
+                                        <span style={{ fontSize: "0.6rem", color: "#94a3b8" }}>{t('upload_proof')}</span>
                                     </>
                                 )}
                             </button>
@@ -189,19 +190,19 @@ function ReportPopup({ r, onClaim, onMarkCleaned, user, onRequestAuth }) {
                                     cursor: "pointer", opacity: (!preview || isUploading) ? 0.5 : 1
                                 }}
                             >
-                                {isUploading ? <Loader2 size={16} className="animate-spin" style={{ margin: "auto" }} /> : "✅ Submit Proof"}
+                                {isUploading ? <Loader2 size={16} className="animate-spin" style={{ margin: "auto" }} /> : t('submit_proof')}
                             </button>
                         </div>
                     ) : (
                         <div style={{ fontSize: "0.65rem", color: "#64748b", fontStyle: "italic", textAlign: "center", padding: "4px" }}>
-                            Claimed by another volunteer
+                            {t('claimed_by_other')}
                         </div>
                     )
                 )}
 
                 {r.status === "pending_proof" && (
                     <div style={{ fontSize: "0.65rem", color: "#f59e0b", background: "#f59e0b10", padding: "8px", borderRadius: "0.5rem", textAlign: "center" }}>
-                        Volunteer working on cleanup...
+                        {t('working_on_cleanup')}
                     </div>
                 )}
             </div>
@@ -210,6 +211,7 @@ function ReportPopup({ r, onClaim, onMarkCleaned, user, onRequestAuth }) {
 }
 
 export default function MapView({ reports, setLocation, onClaim, onMarkCleaned, user, onRequestAuth, theme }) {
+    const { t } = useLanguage()
     const [filter, setFilter] = useState("all")
     const pinRef = useRef(null)
 
@@ -242,6 +244,7 @@ export default function MapView({ reports, setLocation, onClaim, onMarkCleaned, 
                                 onMarkCleaned={onMarkCleaned}
                                 user={user}
                                 onRequestAuth={onRequestAuth}
+                                t={t}
                             />
                         </Popup>
                     </Marker>

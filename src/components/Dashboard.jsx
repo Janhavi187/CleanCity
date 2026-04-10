@@ -1,14 +1,16 @@
 import { LayoutList, Clock, CheckCircle, Trophy, ImagePlus } from "lucide-react"
 import { motion } from "framer-motion"
+import { useLanguage } from "../context/LanguageContext"
 
 const STATS = [
-    { key: "total", label: "Reports", color: "#3b82f6", icon: LayoutList },
-    { key: "pending", label: "Pending", color: "#f59e0b", icon: ImagePlus }, // Added pending proof
-    { key: "cleaned", label: "Cleaned", color: "#22c55e", icon: CheckCircle },
-    { key: "points", label: "Total XP", color: "#a855f7", icon: Trophy },
+    { key: "total", labelKey: "stats_total", color: "#3b82f6", icon: LayoutList },
+    { key: "pending", labelKey: "stats_pending", color: "#f59e0b", icon: ImagePlus },
+    { key: "cleaned", labelKey: "stats_cleaned", color: "#22c55e", icon: CheckCircle },
+    { key: "points", labelKey: "stats_xp", color: "#a855f7", icon: Trophy },
 ]
 
 export default function Dashboard({ reports }) {
+    const { t } = useLanguage()
     const total      = reports.length
     const pending    = reports.filter(r => r.status === "in_progress" || r.status === "pending_proof").length
     const cleaned    = reports.filter(r => r.status === "cleaned").length
@@ -25,7 +27,7 @@ export default function Dashboard({ reports }) {
             zIndex: 2000, display: "flex", gap: 10,
             pointerEvents: "none"
         }}>
-            {STATS.map(({ key, label, color, icon: Icon }) => (
+            {STATS.map(({ key, labelKey, color, icon: Icon }) => (
                 <motion.div
                     key={key}
                     initial={{ opacity: 0, y: -20 }}
@@ -52,7 +54,7 @@ export default function Dashboard({ reports }) {
                     </div>
                     <div>
                         <p style={{ margin: 0, fontSize: "0.6rem", color: "#64748b", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                            {label}
+                            {t(labelKey)}
                         </p>
                         <p style={{ margin: 0, fontSize: "1.15rem", fontWeight: 800, color: "#f1f5f9", lineHeight: 1.2 }}>
                             {values[key]}

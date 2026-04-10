@@ -2,8 +2,10 @@ import { useState, useEffect } from "react"
 import { db } from "../firebase"
 import { collection, addDoc } from "firebase/firestore"
 import { Camera, MapPin, Loader2, Sparkles, Send } from "lucide-react"
+import { useLanguage } from "../context/LanguageContext"
 
 export default function ReportForm({ location }) {
+    const { t } = useLanguage()
     const [file, setFile] = useState(null)
     const [severity, setSeverity] = useState("low")
     const [isUploading, setIsUploading] = useState(false)
@@ -12,6 +14,8 @@ export default function ReportForm({ location }) {
 
     const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
     const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
+
+    const sev_labels = { low: t('low'), medium: t('medium'), high: t('high') }
 
     // Simulate AI classification
     useEffect(() => {
@@ -28,7 +32,7 @@ export default function ReportForm({ location }) {
     }, [file])
 
     const handleSubmit = async () => {
-        if (!file || !location) return alert("Select location + image")
+        if (!file || !location) return alert(t('t_select_loc_img'))
         
         setIsUploading(true)
         try {
@@ -58,10 +62,10 @@ export default function ReportForm({ location }) {
 
             setFile(null)
             setAiLabel("")
-            alert("EcoTrack AI: Report Logged Successfully!")
+            alert(t('t_report_success'))
         } catch (error) {
             console.error(error)
-            alert("Error reporting waste")
+            alert(t('t_error_reporting'))
         } finally {
             setIsUploading(false)
         }
@@ -72,7 +76,7 @@ export default function ReportForm({ location }) {
             <div className="glass-card space-y-4">
                 <div className="flex items-center gap-2 mb-2">
                     <Sparkles className="text-primary w-5 h-5" />
-                    <h3 className="font-bold text-lg">AI Report Engine</h3>
+                    <h3 className="font-bold text-lg">{t('report_engine')}</h3>
                 </div>
 
                 {/* File Input */}
@@ -92,7 +96,7 @@ export default function ReportForm({ location }) {
                         ) : (
                             <>
                                 <Camera className="w-8 h-8 text-slate-400 mb-2" />
-                                <span className="text-sm text-slate-400">Capture or Upload</span>
+                                <span className="text-sm text-slate-400">{t('capture_upload')}</span>
                             </>
                         )}
                     </label>
@@ -102,22 +106,22 @@ export default function ReportForm({ location }) {
                 {isAnalyzing && (
                     <div className="flex items-center gap-2 text-sm text-primary animate-pulse">
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Analyzing waste composition...
+                        {t('analyzing')}
                     </div>
                 )}
 
                 {aiLabel && !isAnalyzing && (
                     <div className="bg-primary/10 border border-primary/20 p-3 rounded-lg">
-                        <p className="text-xs uppercase font-bold text-primary mb-1 text-[10px]">AI Classification</p>
-                        <p className="text-sm font-semibold">{aiLabel}</p>
-                        <p className="text-xs text-slate-400 mt-1">Severity Auto-set: <span className="text-white capitalize">{severity}</span></p>
+                        <p className="text-xs uppercase font-bold text-primary mb-1 text-[10px]">{t('ai_class')}</p>
+                        <p className="text-sm font-semibold">{t(aiLabel)}</p>
+                        <p className="text-xs text-slate-400 mt-1">{t('severity_set')}: <span className="text-white capitalize">{t(severity)}</span></p>
                     </div>
                 )}
 
                 <div className="flex items-center gap-2 text-xs py-2 px-1 rounded-md bg-white/5">
                     <MapPin className="w-4 h-4 text-secondary" />
                     <span className={location ? "text-white" : "text-amber-500 animate-pulse"}>
-                        {location ? `Pin: ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : "Click map to set location"}
+                        {location ? `${t('map_pin')}: ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : t('click_to_set')}
                     </span>
                 </div>
 
@@ -126,7 +130,7 @@ export default function ReportForm({ location }) {
                     onClick={handleSubmit} 
                     className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed group"
                 >
-                    {isUploading ? <Loader2 className="animate-spin" /> : <><Send size={18} className="group-hover:translate-x-1 transition-transform" /> Submit Report</>}
+                    {isUploading ? <Loader2 className="animate-spin" /> : <><Send size={18} className="group-hover:translate-x-1 transition-transform" /> {t('submit_report')}</>}
                 </button>
             </div>
         </div>
