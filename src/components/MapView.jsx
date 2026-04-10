@@ -5,7 +5,7 @@ import { Layers, Navigation } from "lucide-react"
 
 /* ── Severity colours ── */
 const SEV_COLOR = { high: "#ef4444", medium: "#f59e0b", low: "#22c55e" }
-const SEV_LABEL = { high: "HIGH",  medium: "MED",  low:  "LOW"  }
+const SEV_LABEL = { high: "HIGH", medium: "MED", low: "LOW" }
 
 /* ── Custom pulsing SVG marker ── */
 function createMarkerIcon(severity) {
@@ -20,9 +20,9 @@ function createMarkerIcon(severity) {
     return L.divIcon({
         className: "",
         html: svg,
-        iconSize:   [36, 42],
+        iconSize: [36, 42],
         iconAnchor: [18, 42],
-        popupAnchor:[0, -44]
+        popupAnchor: [0, -44]
     })
 }
 
@@ -34,7 +34,7 @@ function MapClickHandler({ setLocation, pinRef }) {
             // Animate pin drop
             if (pinRef.current) {
                 pinRef.current.style.display = "block"
-                pinRef.current.style.top  = e.containerPoint.y + "px"
+                pinRef.current.style.top = e.containerPoint.y + "px"
                 pinRef.current.style.left = e.containerPoint.x + "px"
             }
         }
@@ -46,9 +46,9 @@ function MapClickHandler({ setLocation, pinRef }) {
 function ReportPopup({ r, onClaim, onMarkCleaned }) {
     const color = SEV_COLOR[r.severity] || "#22c55e"
     const statusBadge = {
-        reported:    { bg: "#1e3a5f", color: "#60a5fa", label: "Reported"     },
-        in_progress: { bg: "#3d2900", color: "#fbbf24", label: "In Progress"  },
-        cleaned:     { bg: "#0d2e1a", color: "#4ade80", label: "Cleaned ✓"    },
+        reported: { bg: "#1e3a5f", color: "#60a5fa", label: "Reported" },
+        in_progress: { bg: "#3d2900", color: "#fbbf24", label: "In Progress" },
+        cleaned: { bg: "#0d2e1a", color: "#4ade80", label: "Cleaned ✓" },
     }[r.status] || {}
 
     return (
@@ -150,10 +150,10 @@ export default function MapView({ reports, setLocation, onClaim, onMarkCleaned }
                 padding: "6px 8px"
             }}>
                 {[
-                    { key: "all",         label: "All",         color: "#e2e8f0" },
-                    { key: "reported",    label: "🔵 Reported",  color: "#60a5fa" },
-                    { key: "in_progress", label: "🟡 Active",    color: "#fbbf24" },
-                    { key: "cleaned",     label: "🟢 Cleaned",   color: "#4ade80" },
+                    { key: "all", label: "All", color: "#e2e8f0" },
+                    { key: "reported", label: "🔵 Reported", color: "#60a5fa" },
+                    { key: "in_progress", label: "🟡 Active", color: "#fbbf24" },
+                    { key: "cleaned", label: "🟢 Cleaned", color: "#4ade80" },
                 ].map(f => (
                     <button key={f.key} onClick={() => setFilter(f.key)} style={{
                         padding: "5px 14px", borderRadius: "9999px",
