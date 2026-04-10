@@ -72,7 +72,11 @@ const translations = {
     "Plastic Waste": "Plastic Waste",
     "Organic Waste": "Organic Waste",
     "Hazardous E-Waste": "Hazardous E-Waste",
-    "Industrial Scrap": "Industrial Scrap"
+    "Industrial Scrap": "Industrial Scrap",
+    // Severity
+    low: "Low",
+    medium: "Medium",
+    high: "High"
   },
   hi: {
     // App / Logo
@@ -143,7 +147,11 @@ const translations = {
     "Plastic Waste": "प्लास्टिक कचरा",
     "Organic Waste": "जैविक कचरा",
     "Hazardous E-Waste": "खतरनाक ई-कचरा",
-    "Industrial Scrap": "औद्योगिक स्क्रैप"
+    "Industrial Scrap": "औद्योगिक स्क्रैप",
+    // Severity
+    low: "न्यून",
+    medium: "मध्यम",
+    high: "उच्च"
   }
 };
 

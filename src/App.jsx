@@ -5,8 +5,9 @@ import {
 } from "firebase/firestore"
 import { onAuthStateChanged } from "firebase/auth"
 import { db, auth } from "./firebase"
-import { Leaf, Users, Bell, LogIn, Sun, Moon } from "lucide-react"
+import { Leaf, Users, Bell, LogIn, Sun, Moon, Languages } from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
+import { useLanguage } from "./context/LanguageContext"
 
 import MapView from "./components/MapView"
 import ReportForm from "./components/ReportForm"
@@ -19,6 +20,7 @@ import Leaderboard from "./components/Leaderboard"
 const SEVERITY_POINTS = { low: 10, medium: 25, high: 50 }
 
 function App() {
+    const { t, language, toggleLanguage } = useLanguage()
     const [reports, setReports] = useState([])
     const [location, setLocation] = useState(null)
     const [recentActivity, setRecentActivity] = useState([])
@@ -60,7 +62,7 @@ function App() {
             setReports(snap.docs.map(d => ({ id: d.id, ...d.data() })))
         }, (err) => {
             console.error(err)
-            pushToast("Firebase connection failed", "error")
+            pushToast(t('t_connection_fail'), "error")
         })
 
         // Recent 5 for activity feed
@@ -81,7 +83,7 @@ function App() {
             volunteerName: user.displayName,
             volunteerPhoto: user.photoURL || ""
         })
-        pushToast("Pickup claimed! En route 🚛", "success")
+        pushToast(t('t_pickup_claimed'), "success")
     }
 
     /* ── Mark as cleaned + award points ── */
@@ -128,9 +130,9 @@ function App() {
                     cleanupCount: 1
                 })
             }
-            pushToast(`Spot fully cleaned! +${pts} pts 🌿`, "success")
+            pushToast(t('t_spot_cleaned').replace('{pts}', pts), "success")
         } else {
-            pushToast("Proof pending. Upload 'After' photo to earn points!", "info")
+            pushToast(t('t_proof_pending'), "info")
         }
     }
 
@@ -191,7 +193,7 @@ function App() {
                 <div className="glass-card">
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                         <Bell size={16} color="#3b82f6" />
-                        <span style={{ fontWeight: 700, fontSize: "0.875rem" }}>Live Activity</span>
+                        <span style={{ fontWeight: 700, fontSize: "0.875rem" }}>{t('live_activity')}</span>
                         <span style={{
                             marginLeft: "auto",
                             background: "#3b82f6", color: "white",
@@ -203,7 +205,7 @@ function App() {
                         <AnimatePresence>
                             {recentActivity.length === 0 && (
                                 <p style={{ fontSize: "0.75rem", color: "#64748b", textAlign: "center", padding: "12px 0" }}>
-                                    No activity yet
+                                    {t('no_activity')}
                                 </p>
                             )}
                             {recentActivity.map((a) => (
@@ -221,9 +223,9 @@ function App() {
                                 >
                                     <span style={{ color: severityColor(a.severity), fontWeight: 700 }}>●</span>
                                     {" "}<span style={{ color: "#e2e8f0" }}>
-                                        {a.wasteType || `${a.severity} severity`}
+                                        {t(a.wasteType) || `${a.severity} severity`}
                                     </span>
-                                    {" "}reported nearby
+                                    {" "}{t('reported_nearby')}
                                 </motion.div>
                             ))}
                         </AnimatePresence>
@@ -239,10 +241,10 @@ function App() {
                         style={{ textAlign: "center", padding: "1rem" }}
                     >
                         <p style={{ margin: "0 0 6px", fontSize: "0.78rem", color: "#94a3b8", fontWeight: 600 }}>
-                            Want to help clean up?
+                            {t('want_to_help')}
                         </p>
                         <p style={{ margin: "0 0 12px", fontSize: "0.7rem", color: "#475569" }}>
-                            Sign in to earn points &amp; rank up
+                            {t('sign_in_desc')}
                         </p>
                         <button
                             onClick={() => setShowAuth(true)}
@@ -255,7 +257,7 @@ function App() {
                                 alignItems: "center", justifyContent: "center", gap: 6
                             }}
                         >
-                            <LogIn size={14} /> Volunteer Sign In
+                            <LogIn size={14} /> {t('volunteer_sign_in')}
                         </button>
                     </motion.div>
                 )}
@@ -280,14 +282,32 @@ function App() {
                             <p style={{ margin: 0, fontSize: "0.78rem", fontWeight: 700, color: "#e2e8f0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                                 {user.displayName}
                             </p>
-                            <p style={{ margin: 0, fontSize: "0.65rem", color: "#22c55e" }}>Volunteer ✓</p>
+                            <p style={{ margin: 0, fontSize: "0.65rem", color: "#22c55e" }}>{t('volunteer_verified')}</p>
                         </div>
                     </motion.div>
                 )}
             </div>
 
-            {/* Sidebar toggle + Theme toggle */}
+            {/* Sidebar toggle + Theme toggle + Language toggle */}
             <div style={{ position: "fixed", top: 20, right: 16, zIndex: 2000, display: "flex", gap: 8 }}>
+                {/* Language toggle */}
+                <button
+                    onClick={toggleLanguage}
+                    title={language === "en" ? "हिन्दी में बदलें" : "Switch to English"}
+                    style={{
+                        background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)",
+                        borderRadius: "0.5rem", padding: "5px 10px",
+                        color: "#e2e8f0", cursor: "pointer",
+                        backdropFilter: "blur(12px)",
+                        display: "flex", alignItems: "center", gap: 5,
+                        transition: "background 0.2s, border-color 0.2s",
+                        fontWeight: 700, fontSize: "0.78rem"
+                    }}
+                >
+                    <Languages size={14} />
+                    {language === "en" ? "हि" : "EN"}
+                </button>
+
                 {/* Theme toggle */}
                 <button
                     onClick={toggleTheme}
@@ -317,7 +337,7 @@ function App() {
                     }}
                 >
                     <Users size={15} style={{ display: "inline", marginRight: 4 }} />
-                    {sidebarOpen ? "Hide Panel" : "Show Panel"}
+                    {sidebarOpen ? t('hide_panel') : t('show_panel')}
                 </button>
             </div>
 
